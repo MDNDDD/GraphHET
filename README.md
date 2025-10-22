@@ -1,19 +1,15 @@
-# RucGraph - a fast graph database system on CPU/GPU platforms
+# GraphHET - a fast graph database system on CPU/GPU platforms
 
-RucGraph is a lightweight graph database system that uses both CPUs and GPUs to efficiently perform graph analyses, such as Shortest Path, PageRank, Community Detection etc.
+GraphHET is a lightweight graph database system that uses both CPUs and GPUs to efficiently perform graph analyses, such as Shortest Path, PageRank, Community Detection etc.
 
-
-- "Ruc" is the abbreviation of "[Renmin University of China](https://www.ruc.edu.cn/)".
-
-
-- RucGraph works efficiently on large graphs with billions of vertices and edges. In particular, on [LDBC Graphalytics Benchmarks](https://ldbcouncil.org/benchmarks/graphalytics/), RucGraph is <b>10 times faster than [neo4j](https://neo4j.com) on CPUs</b>, and <b>50 times faster than  [neo4j](https://neo4j.com) on GPUs</b>.
+- GraphHET works efficiently on large graphs with billions of vertices and edges. In particular, on [LDBC Graphalytics Benchmarks](https://ldbcouncil.org/benchmarks/graphalytics/), GraphHET is <b>10 times faster than [neo4j](https://neo4j.com) on CPUs</b>, and <b>50 times faster than  [neo4j](https://neo4j.com) on GPUs</b>.
 
 
 
 
 ## Graph data structures & algorithms
 
-RucGraph is now using [Adjacency Lists](https://www.geeksforgeeks.org/adjacency-list-meaning-definition-in-dsa/) to store graphs in CPU memory, and using [Sparse Matrix Representations](https://www.geeksforgeeks.org/sparse-matrix-representations-set-3-csr/) (CSRs), GPU Packed Memory Array (GPMA) to store graphs in GPU memory. 
+GraphHET is now using [Adjacency Lists](https://www.geeksforgeeks.org/adjacency-list-meaning-definition-in-dsa/) to store graphs in CPU memory, and using [Sparse Matrix Representations](https://www.geeksforgeeks.org/sparse-matrix-representations-set-3-csr/) (CSRs), GPU Packed Memory Array (GPMA) to store graphs in GPU memory. 
 
 
 We have implemented 5 graph analysis algorithms on both CPUs and GPUs to date: Breadth-First Search (BFS), PageRank (PR), Weakly Connected Components (WCC), Community Detection using Label Propagation (CDLP), Single-Source Shortest Paths (SSSP). The pseudo codes of these algorithms can be found in the end of [the LDBC Graphalytics Benchmark handbook](https://arxiv.org/pdf/2011.15028). Nevertheless, our implementations are optimized for parallel computation, and may be considerably different from these pseudo codes.
@@ -61,7 +57,7 @@ We have implemented 5 graph analysis algorithms on both CPUs and GPUs to date: B
 
 ## Build & Run
 
-Here, we show how to build & run RucGraph on a Linux server with the Ubuntu 20.04 system, 2 Intel(R) Xeon(R) Gold 5218 CPUs, and 4 NVIDIA GeForce RTX 3090 GPUs. The environment is as follows.
+Here, we show how to build & run GraphHET on a Linux server with the Ubuntu 20.04 system, 2 Intel(R) Xeon(R) Gold 5218 CPUs, and 4 NVIDIA GeForce RTX 3090 GPUs. The environment is as follows.
 
 <b>On 170 server, before compiling, 1st, use the "source /opt/rh/devtoolset-11/enable" command to change g++; 2nd, change "cmake" in the following commands to "cmake3". </b>
 
@@ -70,19 +66,19 @@ Here, we show how to build & run RucGraph on a Linux server with the Ubuntu 20.0
 - `nvidia-smi`: NVIDIA-SMI 550.54.14         /      Driver Version: 550.54.14   /   CUDA Version: 12.4
 
 
-First, download the files onto the server, e.g., onto the following path: `/home/username/RucGraph`. Second, enter the following commands on a terminal at this path:
+First, download the files onto the server, e.g., onto the following path: `/home/username/GraphHET`. Second, enter the following commands on a terminal at this path:
 
 ```shell
-username@server:~/RucGraph$ mkdir build
-username@server:~/RucGraph$ cd build
-username@server:~/RucGraph/build$ cmake .. -DBUILD_CPU=ON -DBUILD_GPU_CSR=ON -DBUILD_GPU_GPMA=ON
-username@server:~/RucGraph/build$ make
-username@server:~/RucGraph/build$ ./bin_cpu/CPU_example
-username@server:~/RucGraph/build$ ./bin_gpu/GPU_example_csr
-username@server:~/RucGraph/build$ ./bin_gpu/GPU_example_gpma
-username@server:~/RucGraph/build$ ./bin_cpu/Test_CPU
-username@server:~/RucGraph/build$ ./bin_gpu/Test_GPU_CSR
-username@server:~/RucGraph/build$ ./bin_gpu/Test_GPU_GPMA
+username@server:~/GraphHET$ mkdir build
+username@server:~/GraphHET$ cd build
+username@server:~/GraphHET/build$ cmake .. -DBUILD_CPU=ON -DBUILD_GPU_CSR=ON -DBUILD_GPU_GPMA=ON
+username@server:~/GraphHET/build$ make
+username@server:~/GraphHET/build$ ./bin_cpu/CPU_example
+username@server:~/GraphHET/build$ ./bin_gpu/GPU_example_csr
+username@server:~/GraphHET/build$ ./bin_gpu/GPU_example_gpma
+username@server:~/GraphHET/build$ ./bin_cpu/Test_CPU
+username@server:~/GraphHET/build$ ./bin_gpu/Test_GPU_CSR
+username@server:~/GraphHET/build$ ./bin_gpu/Test_GPU_GPMA
 ```
 
 There are some explanations for the above commands:
