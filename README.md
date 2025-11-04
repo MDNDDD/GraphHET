@@ -57,7 +57,7 @@ We have implemented 5 graph analysis algorithms on both CPUs and GPUs to date: B
 
 ## Build & Run
 
-Here, we show how to build & run GraphHET on a Linux server with the Ubuntu 20.04 system, 2 Intel(R) Xeon(R) Gold 5218 CPUs, and 4 NVIDIA GeForce RTX 3090 GPUs. The environment is as follows.
+Here, we show how to build & run GraphHET on a Linux server with the Ubuntu 20.04 system, 2 Intel(R) Xeon(R) Platinum 8360Y CPUs, and 4 NVIDIA L20 GPUs. The environment is as follows.
 
 <b>On 170 server, before compiling, 1st, use the "source /opt/rh/devtoolset-11/enable" command to change g++; 2nd, change "cmake" in the following commands to "cmake3". </b>
 
