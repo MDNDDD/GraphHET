@@ -9,7 +9,7 @@ GraphHET is a lightweight graph database system that uses both CPUs and GPUs to 
 
 ## Graph data structures & algorithms
 
-GraphHET is now using [Adjacency Lists](https://www.geeksforgeeks.org/adjacency-list-meaning-definition-in-dsa/) to store graphs in CPU memory, and using [Sparse Matrix Representations](https://www.geeksforgeeks.org/sparse-matrix-representations-set-3-csr/) (CSRs), GPU Packed Memory Array (GPMA) to store graphs in GPU memory. 
+GraphHET is now using [Adjacency Lists](https://www.geeksforgeeks.org/adjacency-list-meaning-definition-in-dsa/) to store graphs in CPU memory, and using [Sparse Matrix Representations](https://www.geeksforgeeks.org/sparse-matrix-representations-set-3-csr/) (CSRs), GPU Packed Memory Array (GPMA+) to store graphs in GPU memory. 
 
 
 We have implemented 5 graph analysis algorithms on both CPUs and GPUs to date: Breadth-First Search (BFS), PageRank (PR), Weakly Connected Components (WCC), Community Detection using Label Propagation (CDLP), Single-Source Shortest Paths (SSSP). The pseudo codes of these algorithms can be found in the end of [the LDBC Graphalytics Benchmark handbook](https://arxiv.org/pdf/2011.15028). Nevertheless, our implementations are optimized for parallel computation, and may be considerably different from these pseudo codes.
@@ -33,11 +33,11 @@ We have implemented 5 graph analysis algorithms on both CPUs and GPUs to date: B
 - `include/GPU_csr/algorithm/`: header files for graph analysis operators on GPUs, such as Shortest Path, PageRank, Community Detection operators; these operators have also passed the LDBC Graphalytics Benchmark test
 
 
-- `include/GPU_gpma/`: header files for operating **GPMA** on GPUs
+- `include/GPU_GPMA+/`: header files for operating **GPMA+** on GPUs
 
-- `include/GPU_gpma/GPU_gpma.hpp`: A GPU Packed Memory Array on GPUs
+- `include/GPU_GPMA+/GPU_GPMA+.hpp`: A GPU Packed Memory Array on GPUs
 
-- `include/GPU_gpma/algorithm/`: header files for graph analysis operators on GPUs, such as Shortest Path, PageRank, Community Detection operators; these operators have also passed the LDBC Graphalytics Benchmark test
+- `include/GPU_GPMA+/algorithm/`: header files for graph analysis operators on GPUs, such as Shortest Path, PageRank, Community Detection operators; these operators have also passed the LDBC Graphalytics Benchmark test
 
 
 - `include/LDBC/`: header files for performing the LDBC Graphalytics Benchmark test
@@ -48,10 +48,10 @@ We have implemented 5 graph analysis algorithms on both CPUs and GPUs to date: B
 - `src/`: source files
 - `src/CPU_adj_list/CPU_example.cpp`: an example of performing graph analysis operators on CPUs
 - `src/GPU_csr/GPU_csr_example.cu`: an example of performing graph analysis operators on GPUs (CSR version)
-- `src/GPU_gpma/GPU_gpma_example.cu`: an example of performing graph analysis operators on GPUs (GPMA version)
+- `src/GPU_GPMA+/GPU_GPMA+_example.cu`: an example of performing graph analysis operators on GPUs (GPMA+ version)
 - `src/LDBC/LDBC_CPU_adj_list.cpp`: the source codes of performing the LDBC Graphalytics Benchmark test on CPUs
 - `src/LDBC/LDBC_GPU_csr.cu`: the source codes of performing the LDBC Graphalytics Benchmark test on GPUs (CSR version)
-- `src/LDBC/LDBC_GPU_gpma.cu`: the source codes of performing the LDBC Graphalytics Benchmark test on GPUs (GPMA version)
+- `src/LDBC/LDBC_GPU_GPMA+.cu`: the source codes of performing the LDBC Graphalytics Benchmark test on GPUs (GPMA+ version)
 
 
 
@@ -71,31 +71,31 @@ First, download the files onto the server, e.g., onto the following path: `/home
 ```shell
 username@server:~/GraphHET$ mkdir build
 username@server:~/GraphHET$ cd build
-username@server:~/GraphHET/build$ cmake .. -DBUILD_CPU=ON -DBUILD_GPU_CSR=ON -DBUILD_GPU_GPMA=ON
+username@server:~/GraphHET/build$ cmake .. -DBUILD_CPU=ON -DBUILD_GPU_CSR=ON -DBUILD_GPU_GPMA+=ON
 username@server:~/GraphHET/build$ make
 username@server:~/GraphHET/build$ ./bin_cpu/CPU_example
 username@server:~/GraphHET/build$ ./bin_gpu/GPU_example_csr
-username@server:~/GraphHET/build$ ./bin_gpu/GPU_example_gpma
+username@server:~/GraphHET/build$ ./bin_gpu/GPU_example_GPMA+
 username@server:~/GraphHET/build$ ./bin_cpu/Test_CPU
 username@server:~/GraphHET/build$ ./bin_gpu/Test_GPU_CSR
-username@server:~/GraphHET/build$ ./bin_gpu/Test_GPU_GPMA
+username@server:~/GraphHET/build$ ./bin_gpu/Test_GPU_GPMA+
 ```
 
 There are some explanations for the above commands:
 
-- `-DBUILD_CPU=ON -DBUILD_GPU_CSR=ON -DBUILD_GPU_GPMA=ON` is to compile both CPU (Adjacency List version), GPU (CSR version) and GPU (GPMA version) codes. If GPUs are not available, then we can change `-DBUILD_GPU_CSR=ON -DBUILD_GPU_GPMA=ON` to `-DBUILD_GPU_CSR=OFF -DBUILD_GPU_GPMA=OFF`.
+- `-DBUILD_CPU=ON -DBUILD_GPU_CSR=ON -DBUILD_GPU_GPMA+=ON` is to compile both CPU (Adjacency List version), GPU (CSR version) and GPU (GPMA+ version) codes. If GPUs are not available, then we can change `-DBUILD_GPU_CSR=ON -DBUILD_GPU_GPMA+=ON` to `-DBUILD_GPU_CSR=OFF -DBUILD_GPU_GPMA+=OFF`.
 
 
 - `./bin_cpu/CPU_example` is to run the source codes at `src/CPU_adj_list/CPU_example.cpp`
 - `./bin_gpu/GPU_example_csr` is to run the source codes at `src/GPU_csr/GPU_csr_example.cu`
-- `./bin_gpu/GPU_example_gpma` is to run the source codes at `src/GPU_gpma/GPU_gpma_example.cu`
+- `./bin_gpu/GPU_example_GPMA+` is to run the source codes at `src/GPU_GPMA+/GPU_GPMA+_example.cu`
 - `./bin_cpu/Test_CPU` is to run the source codes at `src/LDBC/LDBC_CPU_adj_list.cpp`
 - `./bin_gpu/Test_GPU_CSR` is to run the source codes at `src/LDBC/LDBC_GPU_csr.cu`
-- `./bin_gpu/Test_GPU_GPMA` is to run the source codes at `src/LDBC/LDBC_GPU_gpma.cu`
+- `./bin_gpu/Test_GPU_GPMA+` is to run the source codes at `src/LDBC/LDBC_GPU_GPMA+.cu`
 
-We can run "CPU_example", "GPU_example_csr" and "GPU_example_gpma" without any graph dataset. The outputs of graph analysis operators will be printed on the terminal. 
+We can run "CPU_example", "GPU_example_csr" and "GPU_example_GPMA+" without any graph dataset. The outputs of graph analysis operators will be printed on the terminal. 
 
-Nevertheless, before running "Test_CPU", "Test_GPU_CSR" and "Test_GPU_GPMA", we need to download the [LDBC Graphalytics datasets](https://repository.surfsara.nl/datasets/cwi/graphalytics) at first. Then, when running "Test_CPU", "Test_GPU_CSR" and "Test_GPU_GPMA", the program will ask us to input the data path and name sequentially. 
+Nevertheless, before running "Test_CPU", "Test_GPU_CSR" and "Test_GPU_GPMA+", we need to download the [LDBC Graphalytics datasets](https://repository.surfsara.nl/datasets/cwi/graphalytics) at first. Then, when running "Test_CPU", "Test_GPU_CSR" and "Test_GPU_GPMA+", the program will ask us to input the data path and name sequentially. 
 
 ```shell
 Please input the data directory: # The program asks
