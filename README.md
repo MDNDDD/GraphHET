@@ -2,7 +2,7 @@
 
 GraphHET is a lightweight graph database system that uses both CPUs and GPUs to efficiently perform graph analyses, such as Shortest Path, PageRank, Community Detection etc.
 
-- GraphHET works efficiently on large graphs with billions of vertices and edges. In particular, on [LDBC Graphalytics Benchmarks](https://ldbcouncil.org/benchmarks/graphalytics/), GraphHET is <b>10 times faster than [neo4j](https://neo4j.com) on CPUs</b>, and <b>50 times faster than  [neo4j](https://neo4j.com) on GPUs</b>.
+- GraphHET works efficiently on large graphs with billions of vertices and edges. In particular, on [LDBC Graphalytics Benchmarks](https://ldbcouncil.org/benchmarks/graphalytics/), GraphHET is <b>10 times faster than [Neo4j](https://neo4j.com) on CPUs</b>, and <b>50 times faster than  [Neo4j](https://neo4j.com) on GPUs</b>.
 
 
 
@@ -57,7 +57,7 @@ We have implemented 5 graph analysis algorithms on both CPUs and GPUs to date: B
 
 ## Build & Run
 
-Here, we show how to build & run GraphHET on a Linux server with the Ubuntu 20.04 system, 2 Intel(R) Xeon(R) Platinum 8360Y CPUs, and 4 NVIDIA L20 GPUs. The environment is as follows.
+Here, we show how to build & run GraphHET on a Linux server with the Red Hat 4.8.5, 2 Intel(R) Xeon(R) Platinum 8360Y CPUs, and 4 NVIDIA L20 GPUs. The environment is as follows.
 
 <b>On 170 server, before compiling, 1st, use the "source /opt/rh/devtoolset-11/enable" command to change g++; 2nd, change "cmake" in the following commands to "cmake3". </b>
 
