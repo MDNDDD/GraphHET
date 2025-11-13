@@ -92,7 +92,7 @@ There are some explanations for the above commands:
 - `./bin_gpu/GPU_example_gpma` is to run the source codes at `src/GPU_gpma/GPU_gpma_example.cu`
 - `./bin_cpu/Test_CPU` is to run the source codes at `src/LDBC/LDBC_CPU_adj_list.cpp`
 - `./bin_gpu/Test_GPU_CSR` is to run the source codes at `src/LDBC/LDBC_GPU_csr.cu`
-- `./bin_gpu/Test_GPU_GPM` is to run the source codes at `src/LDBC/LDBC_GPU_gpma.cu`
+- `./bin_gpu/Test_GPU_GPMA` is to run the source codes at `src/LDBC/LDBC_GPU_gpma.cu`
 
 We can run "CPU_example", "GPU_example_csr" and "GPU_example_gpma" without any graph dataset. The outputs of graph analysis operators will be printed on the terminal. 
 
