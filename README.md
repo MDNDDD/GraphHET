@@ -12,7 +12,7 @@ GraphHET is a lightweight graph database system that uses both CPUs and GPUs to 
 GraphHET is now using [Adjacency Lists](https://www.geeksforgeeks.org/adjacency-list-meaning-definition-in-dsa/) to store graphs in CPU memory, and using [Sparse Matrix Representations](https://www.geeksforgeeks.org/sparse-matrix-representations-set-3-csr/) (CSRs), [GPU-oriented Packed Memory Array](https://github.com/desert0616/gpma_demo) (GPMA+) to store graphs in GPU memory. 
 
 
-We have implemented 5 graph analysis algorithms on both CPUs and GPUs to date: Breadth-First Search (BFS), Single-Source Shortest Paths (SSSP), Weakly Connected Components (WCC), PageRank (PR), Community Detection using Label Propagation (CDLP). The pseudo codes of these algorithms can be found in the end of [the LDBC Graphalytics Benchmark handbook](https://arxiv.org/pdf/2011.15028). Nevertheless, our implementations are optimized for parallel computation, and may be considerably different from these pseudo codes.
+We have implemented 5 graph analysis algorithms on both CPUs and GPUs to date: Breadth-First Search (BFS), Single-Source Shortest Paths (SSSP), Weakly Connected Components (WCC), PageRank (PR), Community Detection using Label Propagation (CDLP), Triangle Counting (TC). The pseudo codes of these algorithms can be found in the end of [the LDBC Graphalytics Benchmark handbook](https://arxiv.org/pdf/2011.15028). Nevertheless, our implementations are optimized for parallel computation, and may be considerably different from these pseudo codes.
 
 
 ## Code File structures
@@ -26,7 +26,6 @@ We have implemented 5 graph analysis algorithms on both CPUs and GPUs to date: B
 
 - `include/CPU_adj_list/algorithm/`: header files for graph analysis operators on CPUs, such as Shortest Path, PageRank, Community Detection operators; these operators have passed the LDBC Graphalytics Benchmark test
   
-
 - `include/GPU_csr/`: header files for operating **CSRs** on GPUs
 
 - `include/GPU_csr/GPU_csr.hpp`: A CSR on GPUs
