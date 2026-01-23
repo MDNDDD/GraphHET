@@ -2,7 +2,7 @@
 
 GraphHET is a lightweight graph database system that uses both CPUs and GPUs to efficiently perform graph analyses, such as Shortest Path, PageRank, Community Detection etc.
 
-- GraphHET works efficiently on large graphs with billions of vertices and edges. In particular, on [LDBC Graphalytics Benchmarks](https://ldbcouncil.org/benchmarks/graphalytics/), GraphHET is <b>10 times faster than [Neo4j](https://neo4j.com) on CPUs</b>, and <b>50 times faster than  [Neo4j](https://neo4j.com) on GPUs</b>.
+- GraphHET works efficiently on large graphs with billions of vertices and edges. In particular, on [LDBC Graphalytics Benchmarks](https://ldbcouncil.org/benchmarks/graphalytics/) and [SNAP](https://snap.stanford.edu) GraphHET is <b>10 times faster than [Neo4j](https://neo4j.com) on CPUs</b>, and <b>50 times faster than  [Neo4j](https://neo4j.com) on GPUs</b>.
 
 
 
