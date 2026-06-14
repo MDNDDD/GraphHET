@@ -1,23 +1,26 @@
 #pragma once
-#include<vector>
-#include<string>
 
-inline std::vector<std::string> parse_string(std::string parse_target, std::string delimiter);
+#include <string>
+#include <vector>
 
-inline std::vector<std::string> parse_string(std::string parse_target, std::string delimiter) {
+// Split without modifying the input string; callers rely on empty fields being preserved.
+inline std::vector<std::string> parse_string(const std::string& parse_target, const std::string& delimiter) {
+    std::vector<std::string> parsed_content;
+    // An empty delimiter would make find() succeed forever, so keep the whole string as one token.
+    if (delimiter.empty()) {
+        parsed_content.push_back(parse_target);
+        return parsed_content;
+    }
 
-	std::vector<std::string> Parsed_content;
-	size_t pos = 0;
-	std::string token;
-	while ((pos = parse_target.find(delimiter)) != std::string::npos) {
-		// find(const string& str, size_t pos = 0) function returns the position of the first occurrence of str in the string, or npos if the string is not found.
-		token = parse_target.substr(0, pos);
-		// The substr(size_t pos = 0, size_t n = npos) function returns a substring of the object, starting at position pos and of length npos
-		Parsed_content.push_back(token); // store the subtr to the list
-		parse_target.erase(0, pos + delimiter.length()); // remove the front substr and the first delimiter
-	}
-	Parsed_content.push_back(parse_target); // store the subtr to the list
+    // Move a read cursor through the string instead of repeatedly erasing from the front.
+    std::size_t start = 0;
+    std::size_t pos = parse_target.find(delimiter, start);
+    while (pos != std::string::npos) {
+        parsed_content.push_back(parse_target.substr(start, pos - start));
+        start = pos + delimiter.length();
+        pos = parse_target.find(delimiter, start);
+    }
+    parsed_content.push_back(parse_target.substr(start));
 
-	return Parsed_content;
-
+    return parsed_content;
 }

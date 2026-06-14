@@ -12,7 +12,6 @@
 #include <string.h>
 #include <GPU_csr/GPU_csr.hpp>
 
-using namespace std;
 #define CD_THREAD_PER_BLOCK 512
 
 __global__ void Label_init(int *labels, int *all_pointer, int N);
@@ -21,7 +20,7 @@ __global__ void Get_New_Label(int *all_pointer, int *prop_labels, int *new_label
 void checkCudaError(cudaError_t err, const char* msg);
 void checkDeviceProperties();
 
-void CDLP_GPU(graph_structure<double>& graph, CSR_graph<double>& input_graph, std::vector<string>& res, int max_iterations);
+void CDLP_GPU(graph_structure<double>& graph, CSR_graph<double>& input_graph, std::vector<std::string>& res, int max_iterations);
 
 std::vector<std::pair<std::string, std::string>> Cuda_CDLP(graph_structure<double>& graph, CSR_graph<double>& input_graph, int max_iterations);
 
@@ -73,7 +72,7 @@ __global__ void Get_New_Label(int *all_pointer, int *prop_labels, int *new_label
 
 // Community Detection Using Label Propagation on GPU
 // Returns label of the graph based on the graph and number of iterations.
-void CDLP_GPU(graph_structure<double>& graph, CSR_graph<double>& input_graph, std::vector<string>& res, int max_iterations) {
+void CDLP_GPU(graph_structure<double>& graph, CSR_graph<double>& input_graph, std::vector<std::string>& res, int max_iterations) {
     int N = graph.size(); // number of vertices in the graph
     dim3 init_label_block((N + CD_THREAD_PER_BLOCK - 1) / CD_THREAD_PER_BLOCK, 1, 1); // the number of blocks used in the gpu
     dim3 init_label_thread(CD_THREAD_PER_BLOCK, 1, 1); // the number of threads used in the gpu
@@ -85,6 +84,15 @@ void CDLP_GPU(graph_structure<double>& graph, CSR_graph<double>& input_graph, st
     int* new_prop_labels = nullptr;
     int* new_labels = nullptr;
     int* labels = nullptr;
+    void *d_temp_storage = nullptr;
+    // Keep all managed/device allocations on one cleanup path for error exits.
+    auto cleanup = [&]() {
+        cudaFree(labels);
+        cudaFree(prop_labels);
+        cudaFree(new_prop_labels);
+        cudaFree(new_labels);
+        cudaFree(d_temp_storage);
+    };
 
     int CD_ITERATION = max_iterations; // fixed number of iterations
     long long E = input_graph.E_all; // number of edges in the graph
@@ -97,6 +105,7 @@ void CDLP_GPU(graph_structure<double>& graph, CSR_graph<double>& input_graph, st
     cudaError_t cuda_status = cudaGetLastError();
     if (cuda_status != cudaSuccess) { // use the cudaGetLastError to check for possible cudaMalloc errors
         fprintf(stderr, "Cuda malloc failed: %s\n", cudaGetErrorString(cuda_status));
+        cleanup();
         return;
     }
 
@@ -106,12 +115,12 @@ void CDLP_GPU(graph_structure<double>& graph, CSR_graph<double>& input_graph, st
     cuda_status = cudaGetLastError();
     if (cuda_status != cudaSuccess) { // use the cudaGetLastError to check for possible label initialization errors
         fprintf(stderr, "Label init failed: %s\n", cudaGetErrorString(cuda_status));
+        cleanup();
         return;
     }
 
     int it = 0; // number of iterations
-    // Determine temporary device storage requirements
-    void *d_temp_storage = NULL;
+    // First CUB call only queries temporary storage size; the second call performs the sort.
     size_t temp_storage_bytes = 0;
     cub::DeviceSegmentedSort::SortKeys(
         d_temp_storage, temp_storage_bytes, prop_labels, new_prop_labels,
@@ -121,11 +130,13 @@ void CDLP_GPU(graph_structure<double>& graph, CSR_graph<double>& input_graph, st
     cuda_status = cudaGetLastError();
     if (cuda_status != cudaSuccess) {
         fprintf(stderr, "Sort failed: %s\n", cudaGetErrorString(cuda_status));
+        cleanup();
         return;
     }
     cudaError_t err = cudaMalloc(&d_temp_storage, temp_storage_bytes);
     if (err != cudaSuccess) {
-        cerr << "Error: " << "Malloc failed" << " (" << cudaGetErrorString(err) << ")" << endl;
+        std::cerr << "Error: " << "Malloc failed" << " (" << cudaGetErrorString(err) << ")" << std::endl;
+        cleanup();
         return;
     }
 
@@ -136,10 +147,11 @@ void CDLP_GPU(graph_structure<double>& graph, CSR_graph<double>& input_graph, st
         cuda_status = cudaGetLastError(); // check for errors
         if (cuda_status != cudaSuccess) {
             fprintf(stderr, "LabelPropagation failed: %s\n", cudaGetErrorString(cuda_status));
+            cleanup();
             return;
         }
 
-        // Run sorting operation
+        // Sort each vertex neighborhood independently before choosing the most frequent label.
         cub::DeviceSegmentedSort::SortKeys(
             d_temp_storage, temp_storage_bytes, prop_labels, new_prop_labels,
             E, N, all_pointer, all_pointer + 1); // sort the labels of each vertex's neighbors
@@ -148,6 +160,7 @@ void CDLP_GPU(graph_structure<double>& graph, CSR_graph<double>& input_graph, st
         cuda_status = cudaGetLastError(); // check for errors
         if (cuda_status != cudaSuccess) {
             fprintf(stderr, "Sort failed: %s\n", cudaGetErrorString(cuda_status));
+            cleanup();
             return;
         }
         
@@ -158,6 +171,7 @@ void CDLP_GPU(graph_structure<double>& graph, CSR_graph<double>& input_graph, st
         cuda_status = cudaGetLastError(); // check for errors
         if (cuda_status != cudaSuccess) {
             fprintf(stderr, "Get_New_Label failed: %s\n", cudaGetErrorString(cuda_status));
+            cleanup();
             return;
         }
 
@@ -169,17 +183,13 @@ void CDLP_GPU(graph_structure<double>& graph, CSR_graph<double>& input_graph, st
         res[i] = graph.vertex_id_to_str[labels[i]].first; // convert the label to string and store it in res
     }
 
-    cudaFree(labels);
-    cudaFree(prop_labels); // free memory
-    cudaFree(new_prop_labels);
-    cudaFree(new_labels);
-    cudaFree(d_temp_storage);
+    cleanup();
 }
 
 // check whether cuda errors occur and output error information
 void checkCudaError(cudaError_t err, const char *msg) {
     if (err != cudaSuccess) {
-        cerr << "Error: " << msg << " (" << cudaGetErrorString(err) << ")" << endl; // output error message
+        std::cerr << "Error: " << msg << " (" << cudaGetErrorString(err) << ")" << std::endl; // output error message
         exit(EXIT_FAILURE);
     }
 }

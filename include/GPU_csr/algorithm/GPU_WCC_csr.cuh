@@ -9,7 +9,6 @@
 #include <vector>
 #include <string.h>
 #include <GPU_csr/GPU_csr.hpp>
-using namespace std;
 
 #define WCCG_THREAD_PER_BLOCK 256
 

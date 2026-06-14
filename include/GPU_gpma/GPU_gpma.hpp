@@ -108,6 +108,7 @@ __global__ void memset_kernel(T *data, T value, SIZE_TYPE size) {
     }
 }
 
+// Recompute per-level occupancy bounds after tree size or segment length changes.
 __host__ void recalculate_density(GPMA &gpma) {
     // Determine the upper and lower limits of the number of nodes in the node subtrees of each layer under the current ratio and segment length
     gpma.lower_element.resize(gpma.tree_height + 1);
@@ -118,6 +119,7 @@ __host__ void recalculate_density(GPMA &gpma) {
 
     // Traverse from the bottom layer of the tree to the root
     for (SIZE_TYPE i = 0; i <= gpma.tree_height; i++) {
+        // Interpolate density thresholds from root to leaf to keep updates local when possible.
         double density_lower = gpma.density_lower_thres_root
                 + (gpma.density_lower_thres_leaf - gpma.density_lower_thres_root) * (gpma.tree_height - i)
                         / gpma.tree_height;
@@ -140,9 +142,11 @@ __host__ void recalculate_density(GPMA &gpma) {
 __device__ void cub_sort_key_value(KEY_TYPE *keys, VALUE_TYPE *values, SIZE_TYPE size, KEY_TYPE *tmp_keys,
         VALUE_TYPE *tmp_values) {
 
+    // CUB may leave the sorted result in either buffer, so copy Current() back through Alternate().
     cub::DoubleBuffer<KEY_TYPE> d_keys(keys, tmp_keys);
     cub::DoubleBuffer<VALUE_TYPE> d_values(values, tmp_values);
 
+    // First CUB sort call queries temporary storage, second call performs the radix sort.
     void *d_temp_storage = NULL;
     size_t temp_storage_bytes = 0;
 
@@ -164,6 +168,7 @@ __device__ void cub_sort_key_value(KEY_TYPE *keys, VALUE_TYPE *values, SIZE_TYPE
 __device__ SIZE_TYPE handle_del_mod(KEY_TYPE *keys, VALUE_TYPE *values, SIZE_TYPE seg_length, KEY_TYPE key,
         VALUE_TYPE value, SIZE_TYPE leaf) {
 
+    // Deletions and in-place updates are consumed here and excluded from later insertion queues.
     if (VALUE_NONE == value)
         leaf = SIZE_NONE;
     for (SIZE_TYPE i = 0; i < seg_length; i++) {
@@ -317,7 +322,7 @@ __device__ void block_redispatch_kernel(KEY_TYPE *keys, VALUE_TYPE *values, SIZE
         BlockValueStoreT(temp_storage.value_store).Store(block_values, thread_values);
         __syncthreads();
 
-        // step3: evenly re-dispatch KVs to leaf segments
+        // Spread sorted KVs across leaf segments to restore GPMA density invariants.
         KEY_TYPE frac = rebalance_width / seg_length;
         KEY_TYPE deno = merge_size;
         for (SIZE_TYPE i = threadIdx.x; i < merge_size; i += blockDim.x) {
@@ -335,7 +340,7 @@ __device__ void block_redispatch_kernel(KEY_TYPE *keys, VALUE_TYPE *values, SIZE
             keys[proj_location] = cur_key;
             values[proj_location] = cur_value;
 
-            // addition for csr
+            // Sentinel column keys mark row boundaries; keep CSR row offsets aligned with GPMA slots.
             if ((cur_key & COL_IDX_NONE) == COL_IDX_NONE) {
                 SIZE_TYPE cur_row = (SIZE_TYPE) (cur_key >> 32);
                 row_offset[cur_row + 1] = proj_location + update_node;
@@ -354,7 +359,7 @@ __global__ void block_rebalancing_kernel(SIZE_TYPE seg_length, SIZE_TYPE level, 
     VALUE_TYPE *value = values + update_node;
     SIZE_TYPE rebalance_width = seg_length << level;
 
-    // compact
+    // Compact valid existing entries before merging the updates assigned to this tree node.
     __shared__ SIZE_TYPE compacted_size;
     block_compact_kernel<THREAD_PER_BLOCK, ITEM_PER_THREAD>(key, value, compacted_size);
     __syncthreads();
@@ -372,7 +377,7 @@ __global__ void block_rebalancing_kernel(SIZE_TYPE seg_length, SIZE_TYPE level, 
                 update_keys + interval_a, update_values + interval_a, interval_size);
         __syncthreads();
 
-        // set SIZE_NONE for executed update
+        // Mark updates as consumed; unconsumed updates are promoted to a wider parent segment.
         for (SIZE_TYPE i = interval_a + threadIdx.x; i < interval_b; i += blockDim.x) {
             update_nodes[i] = SIZE_NONE;
         }
@@ -442,7 +447,7 @@ __device__ void compact_kernel(SIZE_TYPE size, KEY_TYPE *keys, VALUE_TYPE *value
     cErr(cudaDeviceSynchronize());
 }
 
-// Reallocate the temporarily stored key-value pairs (tmp_keys/tmp_values) to the specified segment
+// Reallocate compacted key-value pairs into sparse GPMA slots inside the specified segment.
 __global__ void redispatch_kernel(KEY_TYPE *tmp_keys, VALUE_TYPE *tmp_values, KEY_TYPE *keys, VALUE_TYPE *values,
         SIZE_TYPE update_width, SIZE_TYPE seg_length, SIZE_TYPE merge_size, SIZE_TYPE *row_offset, SIZE_TYPE update_node) {
 
@@ -483,8 +488,7 @@ __global__ void rebalancing_kernel(SIZE_TYPE unique_update_size, SIZE_TYPE seg_l
         KEY_TYPE *key = keys + update_node;
         VALUE_TYPE *value = values + update_node;
 
-        // compact
-        // Remove invalid data
+        // Remove invalid data before merging the pending update range.
         compact_kernel(update_width, key, value, compacted_size, tmp_keys, tmp_values, tmp_exscan, tmp_label);
         cErr(cudaDeviceSynchronize());
 
@@ -535,6 +539,7 @@ __host__ void rebalance_batch(SIZE_TYPE level, SIZE_TYPE seg_length, KEY_TYPE *k
     SIZE_TYPE update_width = seg_length << level;
 
     if (update_width <= 1024) {
+        // Small segments fit in one CUDA block and use shared-memory block primitives.
         // func pointer for each template
         void (*func_arr[10])(SIZE_TYPE, SIZE_TYPE, KEY_TYPE*, VALUE_TYPE*, SIZE_TYPE*, KEY_TYPE*, VALUE_TYPE*,
                 SIZE_TYPE*, SIZE_TYPE*, SIZE_TYPE, SIZE_TYPE, SIZE_TYPE*);
@@ -556,7 +561,7 @@ __host__ void rebalance_batch(SIZE_TYPE level, SIZE_TYPE seg_length, KEY_TYPE *k
         func_arr[fls(update_width) - 2]<<<BLOCKS_NUM, THREADS_NUM>>>(seg_length, level, keys, values, update_nodes,
                 update_keys, update_values, unique_update_nodes, update_offset, lower_bound, upper_bound, row_offset);
     } else {
-        // operate each tree node by cub-kernel (dynamic parallelsim)
+        // Large segments use global-memory CUB primitives to avoid oversized shared-memory blocks.
         SIZE_TYPE *compacted_size;
         cErr(cudaMalloc(&compacted_size, sizeof(SIZE_TYPE)));
         KEY_TYPE* tmp_keys;
@@ -575,7 +580,7 @@ __host__ void rebalance_batch(SIZE_TYPE level, SIZE_TYPE seg_length, KEY_TYPE *k
                 compacted_size, tmp_keys, tmp_values, tmp_exscan, tmp_label);
         cErr(cudaDeviceSynchronize());
 
-        // Release the current block's video memory
+        // Release per-call temporary device buffers.
         cErr(cudaFree(compacted_size));
         cErr(cudaFree(tmp_keys));
         cErr(cudaFree(tmp_values));
@@ -592,7 +597,7 @@ struct three_tuple_first_none {
     }
 };
 
-// Traverse and insert, and compress the invalid inserted values
+// Remove consumed updates from the zipped node/key/value arrays without breaking alignment.
 __host__ void compact_insertions(DEV_VEC_SIZE &update_nodes, DEV_VEC_KEY &update_keys, DEV_VEC_VALUE &update_values,
         SIZE_TYPE &update_size) {
 
@@ -607,7 +612,7 @@ __host__ void compact_insertions(DEV_VEC_SIZE &update_nodes, DEV_VEC_KEY &update
 // and a unique list of nodes along with their corresponding offset information is generated
 __host__ SIZE_TYPE group_insertion_by_node(SIZE_TYPE *update_nodes, SIZE_TYPE update_size,
         SIZE_TYPE *unique_update_nodes, SIZE_TYPE *update_offset) {
-    // step1: encode
+    // Run-length encode requires sorted update_nodes and returns one run per target tree node.
     void *d_temp_storage = NULL;
     size_t temp_storage_bytes = 0;
     SIZE_TYPE *tmp_offset;
@@ -634,7 +639,7 @@ __host__ SIZE_TYPE group_insertion_by_node(SIZE_TYPE *update_nodes, SIZE_TYPE up
     cErr(cudaFree(num_runs_out));
     cErr(cudaFree(d_temp_storage));
     
-    // step2: exclusive scan
+    // Exclusive scan converts per-node run lengths into offsets for each update range.
     d_temp_storage = NULL;
     temp_storage_bytes = 0;
     cErr(cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, tmp_offset,
@@ -667,6 +672,7 @@ __global__ void up_level_kernel(SIZE_TYPE *update_nodes, SIZE_TYPE update_size, 
 
     for (SIZE_TYPE i = global_thread_id; i < update_size; i += block_offset) {
         SIZE_TYPE node = update_nodes[i];
+        // Clear the current level bit so unresolved updates move to the parent segment.
         update_nodes[i] = node & ~update_width;
     }
 }
@@ -687,7 +693,7 @@ struct kv_tuple_none {
 };
 
 __host__ int resize_gpma(GPMA &gpma, DEV_VEC_KEY &update_keys, DEV_VEC_VALUE &update_values, SIZE_TYPE update_size) {
-    // Move the existing gpma to the front and calculate the length of the compressed and valid content
+    // Compact valid GPMA entries before choosing a larger tree that satisfies root density.
     auto zip_begin = thrust::make_zip_iterator(thrust::make_tuple(gpma.keys.begin(), gpma.values.begin()));
     auto zip_end = thrust::remove_if(zip_begin, zip_begin + gpma.keys.size(), kv_tuple_none());
     cErr(cudaDeviceSynchronize());
@@ -778,7 +784,7 @@ __host__ void update_gpma(GPMA &gpma, DEV_VEC_KEY &update_keys, DEV_VEC_VALUE &u
         return;
     }
     
-    // step5: rebalance each tree level
+    // Try progressively wider segments; each level consumes updates that fit its density bounds.
     for (SIZE_TYPE level = 0; level <= gpma.tree_height && update_size; level++) {
         SIZE_TYPE lower_bound = gpma.lower_element[level];
         SIZE_TYPE upper_bound = gpma.upper_element[level];
@@ -791,7 +797,7 @@ __host__ void update_gpma(GPMA &gpma, DEV_VEC_KEY &update_keys, DEV_VEC_VALUE &u
         // compact
         compact_insertions(update_nodes, update_keys, update_values, update_size);
 
-        // up level
+        // Unconsumed updates are promoted to the parent segment and regrouped there.
         up_level_batch(RAW_PTR(update_nodes), update_size, gpma.segment_length << level);
 
         // re-compress
@@ -799,7 +805,7 @@ __host__ void update_gpma(GPMA &gpma, DEV_VEC_KEY &update_keys, DEV_VEC_VALUE &u
                 unique_node_size);
     }
     
-    // step6: rebalance the root node if necessary
+    // Remaining updates could not fit below the root, so grow/rebuild and rebalance at root width.
     if (update_size > 0) {
         resize_gpma(gpma, update_keys, update_values, update_size);
 

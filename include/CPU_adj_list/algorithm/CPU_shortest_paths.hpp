@@ -8,7 +8,6 @@
 
 #include <CPU_adj_list/CPU_adj_list.hpp>
 
-using namespace std;
 
 struct node {
 	double dis;//distance from source vertex
@@ -35,7 +34,7 @@ std::vector<double> CPU_shortest_paths(std::vector<std::vector<std::pair<int, do
 	distances[source] = 0;//Starting distance is 0
 	std::vector<int> vis(N, 0);
 
-	std::priority_queue<node, vector<node>, greater<node> > Q;//Using Heap Optimization Algorithm
+	std::priority_queue<node, std::vector<node>, std::greater<node>> Q;//Using Heap Optimization Algorithm
 	Q.push({0, source});
 
 	while (Q.size() > 0) {

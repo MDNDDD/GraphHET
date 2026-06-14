@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
+#include <iostream>
+#include <vector>
 #include <GPU_gpma/GPU_gpma.hpp>
 
 template<SIZE_TYPE THREADS_NUM>
@@ -237,13 +239,25 @@ __host__ void gpma_cdlp(graph_structure<double> &graph, GPMA& gpma_in, GPMA& gpm
     SIZE_TYPE *labels = nullptr;
     SIZE_TYPE *labels_begin = nullptr;
     SIZE_TYPE *labels_end = nullptr;
-    SIZE_TYPE *node_queue_offset;
+    SIZE_TYPE *node_queue_offset = nullptr;
     
     int CD_ITERATION = max_iterations; // fixed number of iterations
     long long E_in = gpma_in.get_size(); // number of edges in the graph_in
     long long E_out = gpma_out.get_size(); // number of edges in the graph_out
 
-    SIZE_TYPE *prop_label_offset;
+    SIZE_TYPE *prop_label_offset = nullptr;
+    void* d_temp_storage = nullptr;
+    // Centralized cleanup prevents leaks on any CUDA error path below.
+    auto cleanup = [&]() {
+        cudaFree(labels);
+        cudaFree(prop_labels);
+        cudaFree(labels_begin);
+        cudaFree(labels_end);
+        cudaFree(node_queue_offset);
+        cudaFree(prop_label_offset);
+        cudaFree(d_temp_storage);
+    };
+
     cudaMalloc(&prop_label_offset, sizeof(SIZE_TYPE));
     cudaMalloc((void**)&labels, (N) * sizeof(SIZE_TYPE));
     cudaMalloc((void**)&labels_begin, (N) * sizeof(SIZE_TYPE));
@@ -254,20 +268,22 @@ __host__ void gpma_cdlp(graph_structure<double> &graph, GPMA& gpma_in, GPMA& gpm
     cudaError_t cuda_status = cudaGetLastError();
     if (cuda_status != cudaSuccess) { // use the cudaGetLastError to check for possible cudaMalloc errors
         fprintf(stderr, "Cuda malloc failed: %s\n", cudaGetErrorString(cuda_status));
+        cleanup();
         return;
     }
     SIZE_TYPE init_label_block = CALC_BLOCKS_NUM_NOLIMIT(THREADS_NUM, N);
     Label_init_v2<<<init_label_block, THREADS_NUM>>>(labels, N); // initialize all labels at once with GPU
     cudaDeviceSynchronize(); // synchronize, ensure the cudaMalloc is complete
     
+    // Query radix-sort temporary storage once; each iteration sorts only the populated prefix.
     size_t temp_storage_bytes = 0;
-    void* d_temp_storage = nullptr;
     cub::DeviceRadixSort::SortKeys(d_temp_storage, temp_storage_bytes, prop_labels, prop_labels, E_in + E_out);
     cudaDeviceSynchronize();
     cudaMalloc(&d_temp_storage, temp_storage_bytes);
     cuda_status = cudaGetLastError();
     if (cuda_status != cudaSuccess) {
         std::cerr << "Error: " << "Malloc failed" << " (" << cudaGetErrorString(cuda_status) << ")" << std::endl;
+        cleanup();
         return;
     }
     
@@ -280,7 +296,7 @@ __host__ void gpma_cdlp(graph_structure<double> &graph, GPMA& gpma_in, GPMA& gpm
         BLOCKS_NUM = CALC_BLOCKS_NUM_NOLIMIT(THREADS_NUM, N);
         SIZE_TYPE zero = 0;
 
-        // step 1: label propagation
+        // Gather propagated labels from both in/out GPMA views into one sortable buffer.
         cudaMemcpy(prop_label_offset, &zero, sizeof(SIZE_TYPE), cudaMemcpyHostToDevice);
         gpma_cdlp_gather_kernel<THREADS_NUM><<<BLOCKS_NUM, THREADS_NUM>>>(prop_labels, prop_label_offset,
             RAW_PTR(gpma_in.keys), RAW_PTR(gpma_in.values), RAW_PTR(gpma_in.row_offset), labels, node_queue_offset);
@@ -291,6 +307,7 @@ __host__ void gpma_cdlp(graph_structure<double> &graph, GPMA& gpma_in, GPMA& gpm
         cuda_status = cudaGetLastError();
         if (cuda_status != cudaSuccess) { // use the cudaGetLastError to check for possible cudaMalloc errors
             fprintf(stderr, "Label propagation failed: %s\n", cudaGetErrorString(cuda_status));
+            cleanup();
             return;
         }
 
@@ -303,12 +320,13 @@ __host__ void gpma_cdlp(graph_structure<double> &graph, GPMA& gpma_in, GPMA& gpm
         cuda_status = cudaGetLastError();
         if (cuda_status != cudaSuccess) { // use the cudaGetLastError to check for possible cudaMalloc errors
             fprintf(stderr, "Sort failed: %s\n", cudaGetErrorString(cuda_status));
+            cleanup();
             return;
         }
         
-        // step3: gather
+        // Append a sentinel label so gather_cdlp can close the final vertex range.
         KEY_TYPE tmp = (((KEY_TYPE)N) << 32) | COL_IDX_NONE;
-        cudaMemcpy(prop_labels + offset, &tmp, sizeof(SIZE_TYPE), cudaMemcpyHostToDevice);
+        cudaMemcpy(prop_labels + offset, &tmp, sizeof(KEY_TYPE), cudaMemcpyHostToDevice);
         cudaDeviceSynchronize();
         BLOCKS_NUM = CALC_BLOCKS_NUM_NOLIMIT(THREADS_NUM, offset);
         gather_cdlp<<<BLOCKS_NUM, THREADS_NUM>>>(prop_labels, labels_begin, labels_end, offset);
@@ -317,6 +335,7 @@ __host__ void gpma_cdlp(graph_structure<double> &graph, GPMA& gpma_in, GPMA& gpm
         cuda_status = cudaGetLastError();
         if (cuda_status != cudaSuccess) { // use the cudaGetLastError to check for possible cudaMalloc errors
             fprintf(stderr, "gather failed: %s\n", cudaGetErrorString(cuda_status));
+            cleanup();
             return;
         }
 
@@ -329,20 +348,14 @@ __host__ void gpma_cdlp(graph_structure<double> &graph, GPMA& gpma_in, GPMA& gpm
     }
     res.resize(N);
 
-    SIZE_TYPE* label_host = new SIZE_TYPE[N];
-    cudaMemcpy(label_host, labels, N * sizeof(SIZE_TYPE), cudaMemcpyDeviceToHost);
+    std::vector<SIZE_TYPE> label_host(N);
+    cudaMemcpy(label_host.data(), labels, N * sizeof(SIZE_TYPE), cudaMemcpyDeviceToHost);
     cudaDeviceSynchronize();
-    for (int i = 0; i < N; i++) {
+    for (SIZE_TYPE i = 0; i < N; i++) {
         res[i] = graph.vertex_id_to_str[label_host[i]].first; // convert the label to string and store it in res
     }
-    
-    cudaFree(labels);
-    cudaFree(prop_labels);
-    cudaFree(labels_begin);
-    cudaFree(labels_end);
-    cudaFree(node_queue_offset);
-    cudaFree(prop_label_offset);
-    cudaFree(d_temp_storage);
+
+    cleanup();
 }
 
 std::vector<std::pair<std::string, std::string>> Cuda_CDLP_optimized(graph_structure<double> &graph, GPMA& gpma_in, GPMA& gpma_out, int max_iterations) {

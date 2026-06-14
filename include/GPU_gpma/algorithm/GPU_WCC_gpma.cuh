@@ -20,8 +20,8 @@ __global__ void gpma_cc_hook_kernel(KEY_TYPE *keys, VALUE_TYPE *values, SIZE_TYP
                 SIZE_TYPE pu = parents[u];
                 SIZE_TYPE pv = parents[v];
                 (*done_flag) = false;
-                SIZE_TYPE max_parent = max(pu, pv);
-                SIZE_TYPE min_parent = min(pu, pv);
+                SIZE_TYPE max_parent = pu > pv ? pu : pv;
+                SIZE_TYPE min_parent = pu < pv ? pu : pv;
                 if (iter % 2) parents[max_parent] = min_parent;
                 else parents[min_parent] = max_parent;
             } else {
@@ -50,36 +50,35 @@ __host__ std::vector<int> gpma_cc(KEY_TYPE *keys, VALUE_TYPE *values, SIZE_TYPE 
     thrust::sequence(results.begin(), results.end());
     cudaDeviceSynchronize();
     
-    bool *h_done_flag;
-    bool *d_done_flag;
-    h_done_flag = (bool*) std::malloc(sizeof(bool));
-    cudaMalloc(&d_done_flag, sizeof(bool));
+    // Host/device done flag terminates when a full hook pass makes no parent changes.
+    bool h_done_flag = true;
+    bool *d_done_flag = nullptr;
+    cErr(cudaMalloc(&d_done_flag, sizeof(bool)));
 
     int iter = 0;
 
     const SIZE_TYPE THREADS_NUM = 256;
     do {
         iter++;
-        h_done_flag[0] = true;
-        cudaMemcpy(d_done_flag, h_done_flag, sizeof(bool), cudaMemcpyHostToDevice);
+        h_done_flag = true;
+        cErr(cudaMemcpy(d_done_flag, &h_done_flag, sizeof(bool), cudaMemcpyHostToDevice));
 
-        // hook
+        // Hook connects component trees along active edges and disables settled edges.
         SIZE_TYPE BLOCKS_NUM = CALC_BLOCKS_NUM(THREADS_NUM, edge_size);
         gpma_cc_hook_kernel<<<BLOCKS_NUM, THREADS_NUM>>>(keys, values, edge_size, RAW_PTR(results), RAW_PTR(edge_flag), d_done_flag, iter, node_size);
 
-        // pointer jumping
+        // Pointer jumping compresses paths so later hooks converge in fewer iterations.
         BLOCKS_NUM = CALC_BLOCKS_NUM(THREADS_NUM, node_size);
         gpma_cc_pointer_jumping_kernel<<<BLOCKS_NUM, THREADS_NUM>>>(RAW_PTR(results), node_size);
 
-        cudaMemcpy(h_done_flag, d_done_flag, sizeof(bool), cudaMemcpyDeviceToHost);
-    } while (!h_done_flag[0]);
+        cErr(cudaMemcpy(&h_done_flag, d_done_flag, sizeof(bool), cudaMemcpyDeviceToHost));
+    } while (!h_done_flag);
 
     std::vector<int> result(node_size);
-    cudaMemcpy(result.data(), RAW_PTR(results), node_size * sizeof(int), cudaMemcpyDeviceToHost);
-    cudaDeviceSynchronize();
+    cErr(cudaMemcpy(result.data(), RAW_PTR(results), node_size * sizeof(int), cudaMemcpyDeviceToHost));
+    cErr(cudaDeviceSynchronize());
 
-    free(h_done_flag);
-    cudaFree(d_done_flag);
+    cErr(cudaFree(d_done_flag));
     edge_flag.clear();
     edge_flag.shrink_to_fit();
     results.clear();

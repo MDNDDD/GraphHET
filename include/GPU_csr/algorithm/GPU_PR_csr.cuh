@@ -9,7 +9,6 @@
 #include <vector>
 #include <GPU_csr/GPU_csr.hpp>
 
-using namespace std;
 
 // Constants
 #define SMALL_BOUND 6
@@ -25,14 +24,14 @@ __global__ void calculate_sink(double *pr, int *N_out_zero_gpu, int out_zero_siz
 __global__ void initialization(double *pr, double *outs, int *out_pointer, int N);
 __global__ void Antecedent_division(double *pr,double *npr, double *outs,double redi_tele, int N);
 
-void GPU_PR(graph_structure<double> &graph, CSR_graph<double>& csr_graph, vector<double> &result, int iterations, double damping);
+void GPU_PR(graph_structure<double> &graph, CSR_graph<double>& csr_graph, std::vector<double> &result, int iterations, double damping);
 
 std::vector<std::pair<std::string, double>> Cuda_PR(graph_structure<double> &graph, CSR_graph<double> &csr_graph, int iterations, double damping);
 
 // The gpu version of the pagerank algorithm
 // return the pagerank of each vertex based on the graph, damping factor and number of iterations.
 // the pagerank value is stored in the results
-void GPU_PR (graph_structure<double> &graph, CSR_graph<double>& csr_graph, vector<double>& result, int iterations, double damping) {
+void GPU_PR (graph_structure<double> &graph, CSR_graph<double>& csr_graph, std::vector<double>& result, int iterations, double damping) {
     int N = graph.V; // number of vertices in the graph
     double teleport = (1 - damping) / N; // teleport mechanism
 
@@ -47,7 +46,16 @@ void GPU_PR (graph_structure<double> &graph, CSR_graph<double>& csr_graph, vecto
 
     dim3 blockPerGrid, threadPerGrid;
 
-    vector<int> sink_vertexs;
+    // One cleanup path covers both normal exit and early CUDA allocation failures.
+    auto cleanup = [&]() {
+        cudaFree(pr);
+        cudaFree(npr);
+        cudaFree(sink_sum);
+        cudaFree(outs);
+        cudaFree(sink_vertex_gpu);
+    };
+
+    std::vector<int> sink_vertexs;
 
     cudaMallocManaged(&outs, N * sizeof(double));
     cudaMallocManaged(&sink_sum, sizeof(double));
@@ -58,9 +66,11 @@ void GPU_PR (graph_structure<double> &graph, CSR_graph<double>& csr_graph, vecto
     cudaError_t cuda_status = cudaGetLastError();
     if (cuda_status != cudaSuccess) { // use the cudaGetLastError to check for possible cudaMalloc errors
         fprintf(stderr, "Cuda malloc failed: %s\n", cudaGetErrorString(cuda_status));
+        cleanup();
         return;
     }
 
+    // Sink vertices contribute through a separate reduction each iteration.
     for (int i = 0; i < N; i++) { // traverse all vertices
         if (graph.OUTs[i].size()==0) // this means that the vertex has no edges
             sink_vertexs.push_back(i); // record the sink vertices
@@ -73,6 +83,7 @@ void GPU_PR (graph_structure<double> &graph, CSR_graph<double>& csr_graph, vecto
     cuda_status = cudaGetLastError();
     if (cuda_status != cudaSuccess) {
         fprintf(stderr, "Cuda malloc failed: %s\n", cudaGetErrorString(cuda_status));
+        cleanup();
         return;
     }
     
@@ -84,6 +95,7 @@ void GPU_PR (graph_structure<double> &graph, CSR_graph<double>& csr_graph, vecto
     initialization<<<blockPerGrid, threadPerGrid>>>(pr, outs, out_pointer, N); // initializes the pagerank and calculates the reciprocal of the out-degree
     cudaDeviceSynchronize();
     while (iteration < iterations) { // continue for a fixed number of iterations
+        // Unified memory lets the host reset the scalar before the reduction kernel consumes it.
         *sink_sum = 0;
         calculate_sink<<<blockPerGrid, threadPerGrid, THREAD_PER_BLOCK * sizeof(double)>>>(pr, sink_vertex_gpu, out_zero_size, sink_sum); // calculate the sinksum
         cudaDeviceSynchronize();
@@ -101,11 +113,7 @@ void GPU_PR (graph_structure<double> &graph, CSR_graph<double>& csr_graph, vecto
     cudaMemcpy(result.data(), pr, N * sizeof(double), cudaMemcpyDeviceToHost); // get gpu PR algorithm result
     cudaDeviceSynchronize();
 
-    cudaFree(pr);
-    cudaFree(npr);
-    cudaFree(sink_sum);
-    cudaFree(outs);
-    cudaFree(sink_vertex_gpu);
+    cleanup();
 }
 
 // initialization of the pagerank state

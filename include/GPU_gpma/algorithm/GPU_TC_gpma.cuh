@@ -10,7 +10,6 @@
 #include <string.h>
 #include <GPU_csr/GPU_csr.hpp>
 #include <GPU_gpma/GPU_gpma.hpp>
-using namespace std;
 
 #define CALC_BLOCKS_NUM(threads, n) (((n) + (threads) - 1) / (threads))
 
