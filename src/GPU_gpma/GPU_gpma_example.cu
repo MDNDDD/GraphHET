@@ -6,7 +6,6 @@
 #include <vector>
 
 #include <GPU_gpma/GPU_gpma.hpp>
-
 #include <GPU_gpma/algorithm/GPU_BFS_gpma.cuh>
 #include <GPU_gpma/algorithm/GPU_WCC_gpma.cuh>
 #include <GPU_gpma/algorithm/GPU_SSSP_gpma.cuh>

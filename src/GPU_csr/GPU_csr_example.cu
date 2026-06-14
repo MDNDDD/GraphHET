@@ -7,7 +7,6 @@
 #include <vector>
 
 #include <GPU_csr/GPU_csr.hpp>
-
 #include <GPU_csr/algorithm/GPU_BFS_csr.cuh>
 #include <GPU_csr/algorithm/GPU_WCC_csr.cuh>
 #include <GPU_csr/algorithm/GPU_SSSP_csr.cuh>

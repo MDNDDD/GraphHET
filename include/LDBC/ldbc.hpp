@@ -1,4 +1,5 @@
 #pragma once
+
 #include <CPU_adj_list/CPU_adj_list.hpp>
 #include <map>
 
