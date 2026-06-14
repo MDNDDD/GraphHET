@@ -1,38 +1,50 @@
-# run chmod +x ./LDBC-CPU.sh to make this file executable
+#!/usr/bin/env bash
 
-data_dir="/home/mabojing/data"
+# Make this script executable with:
+# chmod +x ./LDBC-CPU.sh
 
-executable="/home/mdnd/CPU_GPU_project-main/build/bin_cpu/Test_CPU"
+data_dir="${DATA_DIR:-/home/mabojing/data}"
+repo_dir="${REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+executable="${EXECUTABLE:-${repo_dir}/build/bin_cpu/Test_CPU}"
+log_dir="${LOG_DIR:-${repo_dir}/logs}"
+input_file="${INPUT_FILE:-input.txt}"
+result_file="${RESULT_FILE:-result-cpu.csv}"
 
 filenames=(
     "wiki-Talk"
     "cit-Patents"
     "kgs"
-    "datagen-7_7-zf"
-    "datagen-7_5-fb"
-    "datagen-7_8-zf"
-    "datagen-7_6-fb"
-    "dota-league"
-    "graph500-22"
-    "datagen-7_9-fb"
-    "datagen-8_2-zf"
-    "datagen-8_0-fb"
-    "graph500-23"
-    "datagen-8_3-zf"
-    "datagen-8_1-fb"
+    # "datagen-7_7-zf"
+    # "datagen-7_5-fb"
+    # "datagen-7_8-zf"
+    # "datagen-7_6-fb"
+    # "dota-league"
+    # "graph500-22"
+    # "datagen-7_9-fb"
+    # "datagen-8_2-zf"
+    # "datagen-8_0-fb"
+    # "graph500-23"
+    # "datagen-8_3-zf"
+    # "datagen-8_1-fb"
 )
+
+mkdir -p "${log_dir}"
+
+if [[ ! -x "${executable}" ]]; then
+    echo "Executable not found or not executable: ${executable}" >&2
+    exit 1
+fi
 
 for filename in "${filenames[@]}"
 do
     for i in {1..1}
     do
-        echo "testing file $filename ..."
-        echo "$data_dir/" > input.txt
-        echo "$filename" >> input.txt
-        
-        echo "$filename" >> result-cpu.csv
-    
-        $executable < input.txt > "/home/mdnd/CPU_GPU_project-main/logs/$filename-CPU.output"
-        echo "test file $filename done."
+        echo "Testing dataset ${filename} ..."
+        printf '%s\n%s\n' "${data_dir%/}/" "${filename}" > "${input_file}"
+
+        echo "${filename}" >> "${result_file}"
+
+        "${executable}" < "${input_file}" > "${log_dir}/${filename}-CPU.output"
+        echo "Finished dataset ${filename}."
     done
 done

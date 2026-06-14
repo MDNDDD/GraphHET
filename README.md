@@ -1,107 +1,119 @@
-# GraphHET - a fast graph database system on CPU/GPU platforms
+# GraphHET: A Fast Graph Database System on CPU/GPU Platforms
 
-GraphHET is a lightweight graph database system that uses both CPUs and GPUs to efficiently perform graph analyses, such as Shortest Path, PageRank, Community Detection etc.
+GraphHET is a lightweight graph database system that uses both CPUs and GPUs to accelerate common graph analytics workloads, including shortest paths, PageRank, and community detection.
 
-- GraphHET works efficiently on large graphs with billions of vertices and edges. In particular, on [LDBC Graphalytics Benchmarks](https://ldbcouncil.org/benchmarks/graphalytics/) and [SNAP](https://snap.stanford.edu) GraphHET is <b>10 times faster than [Neo4j](https://neo4j.com) on CPUs</b>, and <b>50 times faster than  [Neo4j](https://neo4j.com) on GPUs</b>.
+GraphHET is designed for large graphs with billions of vertices and edges. On the [LDBC Graphalytics benchmark](https://ldbcouncil.org/benchmarks/graphalytics/) and graphs from [SNAP](https://snap.stanford.edu), the project reports performance that is up to **10x faster than [Neo4j](https://neo4j.com) on CPUs** and up to **50x faster than Neo4j on GPUs**.
 
+## Graph Data Structures and Algorithms
 
+GraphHET uses different graph representations for different hardware targets:
 
+- **CPU memory**: [Adjacency lists](https://www.geeksforgeeks.org/adjacency-list-meaning-definition-in-dsa/)
+- **GPU memory**: [Compressed Sparse Row (CSR)](https://www.geeksforgeeks.org/sparse-matrix-representations-set-3-csr/) and [GPMA+](https://github.com/desert0616/gpma_demo)
 
-## Graph data structures & algorithms
+The repository currently includes implementations of six graph algorithms on both CPU and GPU backends:
 
-GraphHET is now using [Adjacency Lists](https://www.geeksforgeeks.org/adjacency-list-meaning-definition-in-dsa/) to store graphs in CPU memory, and using [Sparse Matrix Representations](https://www.geeksforgeeks.org/sparse-matrix-representations-set-3-csr/) (CSRs), [GPU-oriented Packed Memory Array](https://github.com/desert0616/gpma_demo) (GPMA+) to store graphs in GPU memory. 
+- Breadth-First Search (BFS)
+- Single-Source Shortest Paths (SSSP)
+- Weakly Connected Components (WCC)
+- PageRank (PR)
+- Community Detection with Label Propagation (CDLP)
+- Triangle Counting (TC)
 
+Reference pseudocode for the LDBC Graphalytics workloads can be found in the [LDBC Graphalytics benchmark handbook](https://arxiv.org/pdf/2011.15028). The implementations in GraphHET are optimized for parallel execution, so they may differ substantially from the pseudocode.
 
-We have implemented 5 graph analysis algorithms on both CPUs and GPUs to date: Breadth-First Search (BFS), Single-Source Shortest Paths (SSSP), Weakly Connected Components (WCC), PageRank (PR), Community Detection using Label Propagation (CDLP), Triangle Counting (TC). The pseudo codes of these algorithms can be found in the end of [the LDBC Graphalytics Benchmark handbook](https://arxiv.org/pdf/2011.15028). Nevertheless, our implementations are optimized for parallel computation, and may be considerably different from these pseudo codes.
+## Repository Structure
 
+- `include/`: Public headers
+- `include/CPU_adj_list/`: CPU adjacency-list data structure and helpers
+- `include/CPU_adj_list/CPU_adj_list.hpp`: CPU adjacency-list implementation
+- `include/CPU_adj_list/algorithm/`: CPU graph algorithm implementations
+- `include/GPU_csr/`: GPU CSR data structure and helpers
+- `include/GPU_csr/GPU_csr.hpp`: GPU CSR implementation
+- `include/GPU_csr/algorithm/`: GPU graph algorithm implementations for the CSR backend
+- `include/GPU_gpma/`: GPU GPMA+ data structure and helpers
+- `include/GPU_gpma/GPU_gpma.hpp`: GPU GPMA+ implementation
+- `include/GPU_gpma/algorithm/`: GPU graph algorithm implementations for the GPMA+ backend
+- `include/LDBC/`: Utilities for running the LDBC Graphalytics benchmark
+- `src/`: Source files
+- `src/CPU_adj_list/CPU_example.cpp`: CPU example program
+- `src/GPU_csr/GPU_csr_example.cu`: GPU example program for the CSR backend
+- `src/GPU_gpma/GPU_gpma_example.cu`: GPU example program for the GPMA+ backend
+- `src/LDBC/LDBC_CPU_adj_list.cpp`: CPU benchmark entry point
+- `src/LDBC/LDBC_GPU_csr.cu`: GPU benchmark entry point for the CSR backend
+- `src/LDBC/LDBC_GPU_gpma.cu`: GPU benchmark entry point for the GPMA+ backend
+- `LDBC-CPU.sh`: Batch script for CPU benchmark runs
+- `LDBC-GPU-csr.sh`: Batch script for GPU CSR benchmark runs
+- `LDBC-GPU-gpma.sh`: Batch script for GPU GPMA+ benchmark runs
 
-## Code File structures
+## Build and Run
 
-- `include/`: header files
+The project has been tested on a Linux server with CentOS 7.9, two Intel Xeon Platinum 8360Y CPUs, and four NVIDIA L20 GPUs. The environment used in the original setup was:
 
+- `cmake --version`: 3.27.9
+- `g++ --version`: 9.4.0
+- `nvidia-smi`: Driver 550.54.14, CUDA 12.4
 
-- `include/CPU_adj_list/`: header files for operating **Adjacency Lists** on CPUs
+For the server named `170`, the original instructions require two adjustments before compiling:
 
-- `include/CPU_adj_list/CPU_adj_list.hpp`: An Adjacency List on CPUs
+1. Run `source /opt/rh/devtoolset-11/enable` to switch the compiler toolchain.
+2. Replace `cmake` with `cmake3` in the commands below.
 
-- `include/CPU_adj_list/algorithm/`: header files for graph analysis operators on CPUs, such as Shortest Path, PageRank, Community Detection operators; these operators have passed the LDBC Graphalytics Benchmark test
-  
-- `include/GPU_csr/`: header files for operating **CSRs** on GPUs
-
-- `include/GPU_csr/GPU_csr.hpp`: A CSR on GPUs
-
-- `include/GPU_csr/algorithm/`: header files for graph analysis operators on GPUs, such as Shortest Path, PageRank, Community Detection operators; these operators have also passed the LDBC Graphalytics Benchmark test
-
-
-- `include/GPU_gpma/`: header files for operating **GPMA+** on GPUs
-
-- `include/GPU_gpma/GPU_gpma.hpp`: A GPU-oriented Packed Memory Array on GPUs
-
-- `include/GPU_gpma/algorithm/`: header files for graph analysis operators on GPUs, such as Shortest Path, PageRank, Community Detection operators; these operators have also passed the LDBC Graphalytics Benchmark test
-
-
-- `include/LDBC/`: header files for performing the LDBC Graphalytics Benchmark test
-
- <br />
-
-
-- `src/`: source files
-- `src/CPU_adj_list/CPU_example.cpp`: an example of performing graph analysis operators on CPUs
-- `src/GPU_csr/GPU_csr_example.cu`: an example of performing graph analysis operators on GPUs (CSR version)
-- `src/GPU_gpma/GPU_gpma_example.cu`: an example of performing graph analysis operators on GPUs (GPMA+ version)
-- `src/LDBC/LDBC_CPU_adj_list.cpp`: the source codes of performing the LDBC Graphalytics Benchmark test on CPUs
-- `src/LDBC/LDBC_GPU_csr.cu`: the source codes of performing the LDBC Graphalytics Benchmark test on GPUs (CSR version)
-- `src/LDBC/LDBC_GPU_gpma.cu`: the source codes of performing the LDBC Graphalytics Benchmark test on GPUs (GPMA+ version)
-
-
-
-## Build & Run
-
-Here, we show how to build & run GraphHET on a Linux server with the CentOS 7.9, 2 Intel(R) Xeon(R) Platinum 8360Y CPUs, and 4 NVIDIA L20 GPUs. The environment is as follows.
-
-<b>On 170 server, before compiling, 1st, use the "source /opt/rh/devtoolset-11/enable" command to change g++; 2nd, change "cmake" in the following commands to "cmake3". </b>
-
-- `cmake --version`: cmake version 3.27.9
-- `g++ --version`: g++ (Ubuntu 9.4.0-1ubuntu1~20.04.2) 9.4.0
-- `nvidia-smi`: NVIDIA-SMI 550.54.14         /      Driver Version: 550.54.14   /   CUDA Version: 12.4
-
-
-First, download the files onto the server, e.g., onto the following path: `/home/username/GraphHET`. Second, enter the following commands on a terminal at this path:
+Clone or copy the repository to a Linux machine, then build it from the repository root:
 
 ```shell
-username@server:~/GraphHET$ mkdir build
-username@server:~/GraphHET$ cd build
-username@server:~/GraphHET/build$ cmake .. -DBUILD_CPU=ON -DBUILD_GPU_CSR=ON -DBUILD_GPU_GPMA=ON
-username@server:~/GraphHET/build$ make
-username@server:~/GraphHET/build$ ./bin_cpu/CPU_example
-username@server:~/GraphHET/build$ ./bin_gpu/GPU_example_csr
-username@server:~/GraphHET/build$ ./bin_gpu/GPU_example_gpma
-username@server:~/GraphHET/build$ ./bin_cpu/Test_CPU
-username@server:~/GraphHET/build$ ./bin_gpu/Test_GPU_CSR
-username@server:~/GraphHET/build$ ./bin_gpu/Test_GPU_GPMA
+mkdir build
+cd build
+cmake .. -DBUILD_CPU=ON -DBUILD_GPU_CSR=ON -DBUILD_GPU_GPMA=ON
+make
+./bin_cpu/CPU_example
+./bin_gpu/GPU_example_csr
+./bin_gpu/GPU_example_gpma
+./bin_cpu/Test_CPU
+./bin_gpu/Test_GPU_CSR
+./bin_gpu/Test_GPU_GPMA
 ```
 
-There are some explanations for the above commands:
+### Build Options
 
-- `-DBUILD_CPU=ON -DBUILD_GPU_CSR=ON -DBUILD_GPU_GPMA=ON` is to compile both CPU (Adjacency List version), GPU (CSR version) and GPU (GPMA+ version) codes. If GPUs are not available, then we can change `-DBUILD_GPU_CSR=ON -DBUILD_GPU_GPMA=ON` to `-DBUILD_GPU_CSR=OFF -DBUILD_GPU_GPMA=OFF`.
+- `-DBUILD_CPU=ON`: build the CPU adjacency-list backend
+- `-DBUILD_GPU_CSR=ON`: build the GPU CSR backend
+- `-DBUILD_GPU_GPMA=ON`: build the GPU GPMA+ backend
 
-
-- `./bin_cpu/CPU_example` is to run the source codes at `src/CPU_adj_list/CPU_example.cpp`
-- `./bin_gpu/GPU_example_csr` is to run the source codes at `src/GPU_csr/GPU_csr_example.cu`
-- `./bin_gpu/GPU_example_gpma` is to run the source codes at `src/GPU_gpma/GPU_gpma_example.cu`
-- `./bin_cpu/Test_CPU` is to run the source codes at `src/LDBC/LDBC_CPU_adj_list.cpp`
-- `./bin_gpu/Test_GPU_CSR` is to run the source codes at `src/LDBC/LDBC_GPU_csr.cu`
-- `./bin_gpu/Test_GPU_GPMA` is to run the source codes at `src/LDBC/LDBC_GPU_gpma.cu`
-
-We can run "CPU_example", "GPU_example_csr" and "GPU_example_gpma" without any graph dataset. The outputs of graph analysis operators will be printed on the terminal. 
-
-Nevertheless, before running "Test_CPU", "Test_GPU_CSR" and "Test_GPU_GPMA", we need to download the [LDBC Graphalytics datasets](https://repository.surfsara.nl/datasets/cwi/graphalytics) at first. Then, when running "Test_CPU", "Test_GPU_CSR" and "Test_GPU_GPMA", the program will ask us to input the data path and name sequentially. 
+If GPUs are not available, build only the CPU backend:
 
 ```shell
-Please input the data directory: # The program asks
-/home/username/data # Input the data path
-Please input the graph name: # The program asks
-datagen-7_5-fb # Input a data name
+cmake .. -DBUILD_CPU=ON -DBUILD_GPU_CSR=OFF -DBUILD_GPU_GPMA=OFF
 ```
 
-After inputting the data path and name, the program will perform the LDBC Graphalytics Benchmark test for this dataset. Specifically, the program will print some parameters of this test, as well as the consumed times of different graph analysis operators on this dataset.
+### Executables
+
+- `./bin_cpu/CPU_example`: runs `src/CPU_adj_list/CPU_example.cpp`
+- `./bin_gpu/GPU_example_csr`: runs `src/GPU_csr/GPU_csr_example.cu`
+- `./bin_gpu/GPU_example_gpma`: runs `src/GPU_gpma/GPU_gpma_example.cu`
+- `./bin_cpu/Test_CPU`: runs `src/LDBC/LDBC_CPU_adj_list.cpp`
+- `./bin_gpu/Test_GPU_CSR`: runs `src/LDBC/LDBC_GPU_csr.cu`
+- `./bin_gpu/Test_GPU_GPMA`: runs `src/LDBC/LDBC_GPU_gpma.cu`
+
+The three example programs can be executed without downloading any dataset. They print algorithm outputs directly to the terminal.
+
+## Running the LDBC Graphalytics Benchmarks
+
+Before running `Test_CPU`, `Test_GPU_CSR`, or `Test_GPU_GPMA`, download the [LDBC Graphalytics datasets](https://repository.surfsara.nl/datasets/cwi/graphalytics). When the benchmark binaries start, they will prompt for the dataset directory and graph name:
+
+```shell
+Please input the data directory:
+/home/username/data
+Please input the graph name:
+datagen-7_5-fb
+```
+
+After the dataset path and graph name are provided, the program runs the corresponding benchmark workload and prints both the benchmark configuration and the execution time for each graph algorithm.
+
+The repository also includes helper scripts for batch benchmark execution:
+
+- `./LDBC-CPU.sh`
+- `./LDBC-GPU-csr.sh`
+- `./LDBC-GPU-gpma.sh`
+
+These scripts iterate through a predefined dataset list and redirect benchmark logs to per-dataset output files.
