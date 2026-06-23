@@ -48,11 +48,15 @@ Reference pseudocode for the LDBC Graphalytics workloads can be found in the [LD
 
 ## Build and Run
 
-The project has been tested on a Linux server with CentOS 7.9, two Intel Xeon Platinum 8360Y CPUs, and four NVIDIA L20 GPUs. The environment used in the original setup was:
+The project has been compiled and run successfully on a Linux server with CentOS 7.9 and an NVIDIA RTX A6000 GPU. The verified build environment is:
 
 - `cmake --version`: 3.27.9
 - `g++ --version`: 9.4.0
-- `nvidia-smi`: Driver 550.54.14, CUDA 12.4
+- CUDA Toolkit: 11.8
+- NVIDIA Driver: 550.54.14
+- GPU: NVIDIA RTX A6000
+
+CUDA 12.4 is known to fail during compilation for this project.
 
 For the server named `170`, the original instructions require two adjustments before compiling:
 
