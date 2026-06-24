@@ -52,7 +52,7 @@ The project has been tested on a Linux server with CentOS 7.9, two Intel Xeon Pl
 
 - `cmake --version`: 3.27.9
 - `g++ --version`: 9.4.0
-- `nvidia-smi`: Driver 550.54.14, CUDA 12.4
+- `nvidia-smi`: Driver 550.54.14, CUDA 11.8
 
 For the server named `170`, the original instructions require two adjustments before compiling:
 
